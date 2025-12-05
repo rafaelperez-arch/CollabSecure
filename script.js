@@ -1,142 +1,60 @@
-// CollabSecure - Lógica de Seguridad y Cliente
-(function(){
-  'use strict';
+document.addEventListener('DOMContentLoaded', () => {
+    const loginForm = document.getElementById('login-form');
+    const flashMsg = document.getElementById('flash');
 
-  // 1. BASE DE DATOS SIMULADA (Usuarios)
-  const usersPlain = {
-    alice: 'password123',
-    bob: 'secret456'
-  };
+    // Credenciales Demo (En una app real, esto vendría del Backend)
+    const USERS = {
+        'alice': 'password123',
+        'bob': 'secret456'
+    };
 
-  // 2. FILTRO ÉTICO (Lista negra)
-  const OFFENSIVE_WORDS = ['tonto', 'estupido', 'inutil', 'idiot', 'stupid', 'mierda'];
+    loginForm.addEventListener('submit', (e) => {
+        e.preventDefault(); // Evita que la página se recargue
 
-  // Ayudantes
-  function $(sel){ return document.querySelector(sel); }
-  function showFlash(text, timeout=3000){
-    const el = $('#flash'); el.textContent = text; el.style.display='block';
-    setTimeout(()=> el.style.display='none', timeout);
-  }
+        // 1. Capturar valores
+        const username = document.getElementById('username').value.trim().toLowerCase();
+        const password = document.getElementById('password').value;
+        const privacyCheck = document.getElementById('accept-privacy');
 
-  // 3. SEGURIDAD: Encriptación SHA-256 Real
-  async function sha256hex(msg){
-    const enc = new TextEncoder();
-    const buf = enc.encode(msg);
-    const hash = await crypto.subtle.digest('SHA-256', buf);
-    const arr = Array.from(new Uint8Array(hash));
-    return arr.map(b => b.toString(16).padStart(2,'0')).join('');
-  }
+        // 2. VALIDACIÓN: ¿Aceptó la política? (Esto es lo que nos faltaba)
+        if (!privacyCheck.checked) {
+            showFlash('Debes aceptar la política de privacidad para continuar.', 'error');
+            return; // Detiene el proceso aquí
+        }
 
-  // Inicializar usuarios con hash
-  const usersHashed = {};
-  async function initUsers(){
-    for(const u of Object.keys(usersPlain)){
-      usersHashed[u] = await sha256hex(usersPlain[u]);
-    }
-    console.log("Sistema de seguridad iniciado: Contraseñas encriptadas en memoria.");
-  }
+        // 3. Simulación de Hashing y Validación
+        // (Verificamos si el usuario existe y la contraseña coincide)
+        if (USERS[username] && USERS[username] === password) {
+            showFlash('¡Autenticación exitosa! Redirigiendo...', 'success');
+            
+            // Simular redirección al dashboard (ocultar login, mostrar tablero)
+            setTimeout(() => {
+                document.getElementById('login-section').style.display = 'none';
+                document.getElementById('board-section').style.display = 'block';
+                document.getElementById('nav-user').textContent = `Hola, ${username}`;
+                document.getElementById('nav-logout').style.display = 'inline';
+            }, 1000);
 
-  // Lógica del Filtro
-  function isOffensive(text){
-    const lower = text.toLowerCase();
-    return OFFENSIVE_WORDS.some(w => lower.includes(w));
-  }
+        } else {
+            showFlash('Usuario o contraseña incorrectos.', 'error');
+        }
+    });
 
-  // Gestión de Mensajes (LocalStorage)
-  function loadMessages(){
-    try{ return JSON.parse(localStorage.getItem('collab_messages')||'[]'); }catch(e){return[]}
-  }
-  function saveMessages(msgs){ localStorage.setItem('collab_messages', JSON.stringify(msgs)); }
-
-  function renderMessages(){
-    const container = $('#messages'); container.innerHTML='';
-    const msgs = loadMessages();
-    if(msgs.length===0){ container.innerHTML='<p>No hay mensajes aún.</p>'; return; }
-    for(const m of msgs){
-      const card = document.createElement('div'); card.className='card msg-card';
-      const meta = document.createElement('div'); meta.className='meta';
-      const left = document.createElement('div'); left.innerHTML = `<strong>${m.sender}</strong> para <em>${m.recipient}</em>`;
-      const right = document.createElement('div'); right.className='ts'; right.textContent = m.ts;
-      meta.appendChild(left); meta.appendChild(right);
-      const content = document.createElement('div'); content.className='content'; content.textContent = m.content;
-      card.appendChild(meta); card.appendChild(content);
-      container.appendChild(card);
-    }
-  }
-
-  // Gestión de Sesión
-  function setSession(user){ sessionStorage.setItem('collab_user', user); }
-  function clearSession(){ sessionStorage.removeItem('collab_user'); }
-  function getSession(){ return sessionStorage.getItem('collab_user'); }
-
-  function showAuthUI(){
-    const user = getSession();
-    if(user){
-      $('#login-section').style.display='none';
-      $('#board-section').style.display='block';
-      $('#nav-logout').style.display='inline';
-      $('#nav-user').textContent = `Usuario: ${user}`;
-      $('#nav-logout').addEventListener('click', (e)=>{ e.preventDefault(); clearSession(); updateUI(); });
-      renderMessages();
-    } else {
-      $('#login-section').style.display='block'; // Mostrar Login
-      $('#board-section').style.display='none'; // Ocultar Tablero
-      $('#nav-logout').style.display='none';
-      $('#nav-user').textContent = '';
-    }
-  }
-
-  // MANEJO DEL LOGIN (Con validación ética)
-  async function handleLogin(ev){
-    ev.preventDefault();
-    const username = $('#username').value.trim();
-    const password = $('#password').value;
-    const accept = $('#accept-privacy').checked; // Checkbox Ético
-
-    if(!username || !password){ showFlash('Ingrese usuario y contraseña.'); return; }
-    
-    // VALIDACIÓN ÉTICA
-    if(!accept){ showFlash('⚠️ Error Ético: Debe aceptar la política de privacidad para continuar.'); return; }
-
-    // VALIDACIÓN DE SEGURIDAD (Comparar Hashes)
-    const h = await sha256hex(password);
-    if(usersHashed[username] && usersHashed[username] === h){
-      setSession(username); showFlash('Login exitoso.'); updateUI();
-      $('#password').value='';
-    } else {
-      showFlash('Credenciales inválidas.');
-    }
-  }
-
-  // MANEJO DE PUBLICACIÓN (Con filtro ofensivo)
-  function handlePost(ev){
-    ev.preventDefault();
-    const sender = getSession(); if(!sender){ showFlash('No autenticado.'); return; }
-    let recipient = $('#recipient').value.trim(); if(!recipient) recipient='Todos';
-    const content = $('#content').value.trim();
-    
-    if(!content){ showFlash('El mensaje no puede estar vacío.'); return; }
-    
-    // VALIDACIÓN DE CONTENIDO (Filtro)
-    if(isOffensive(content)){ 
-        alert('🚫 BLOQUEO DE SEGURIDAD: Tu mensaje contiene palabras ofensivas y ha sido bloqueado por el filtro ético.');
-        return; 
+    // Función para mostrar mensajes de alerta
+    function showFlash(message, type) {
+        flashMsg.textContent = message;
+        flashMsg.className = `flash-msg ${type}`; // 'error' o 'success'
+        
+        // Borrar mensaje después de 3 segundos
+        setTimeout(() => {
+            flashMsg.textContent = '';
+            flashMsg.className = 'flash-msg';
+        }, 3000);
     }
 
-    const msgs = loadMessages();
-    msgs.unshift({ sender, recipient, content, ts: new Date().toLocaleString() });
-    saveMessages(msgs);
-    $('#content').value=''; 
-    renderMessages(); 
-  }
-
-  function updateUI(){ showAuthUI(); }
-
-  // Inicialización
-  (async function(){ await initUsers();
-    document.getElementById('login-form').addEventListener('submit', handleLogin);
-    document.getElementById('post-form').addEventListener('submit', handlePost);
-    updateUI();
-  })();
-
-})();
+    // Botón de cerrar sesión (opcional)
+    document.getElementById('nav-logout').addEventListener('click', (e) => {
+        e.preventDefault();
+        location.reload(); // Recarga la página para salir
+    });
+});
