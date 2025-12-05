@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
-    /* =====================================================
-       1. LÓGICA DE LOGIN Y SEGURIDAD
-    ===================================================== */
+    /* -----------------------------------------------------
+       1. LÓGICA DE LOGIN (Lo que ya tenías)
+    ----------------------------------------------------- */
     const loginForm = document.getElementById('login-form');
     const flashMsg = document.getElementById('flash');
     const loginSection = document.getElementById('login-section');
@@ -9,31 +9,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const navUser = document.getElementById('nav-user');
     const navLogout = document.getElementById('nav-logout');
 
-    // Usuarios Demo (Simulación de Base de Datos)
-    const USERS = { 
-        'alice': 'password123', 
-        'bob': 'secret456' 
-    };
+    // Usuarios Demo
+    const USERS = { 'alice': 'password123', 'bob': 'secret456' };
 
     loginForm.addEventListener('submit', (e) => {
         e.preventDefault();
-        
-        // Capturar valores
         const username = document.getElementById('username').value.trim().toLowerCase();
         const password = document.getElementById('password').value;
         const privacyCheck = document.getElementById('accept-privacy');
 
-        // VALIDACIÓN 1: ¿Aceptó la política de privacidad?
+        // Validación de Checkbox
         if (!privacyCheck.checked) {
-            showFlash('Debes aceptar la política de privacidad y uso de datos.', 'error');
-            return; // Detiene el proceso si no está marcado
+            showFlash('Debes aceptar la política de privacidad.', 'error');
+            return;
         }
 
-        // VALIDACIÓN 2: Credenciales correctas
+        // Validación de Credenciales
         if (USERS[username] && USERS[username] === password) {
             showFlash('¡Bienvenido! Ingresando al sistema...', 'success');
-            
-            // Simular carga y cambio de pantalla
             setTimeout(() => {
                 loginSection.style.display = 'none';
                 boardSection.style.display = 'block';
@@ -41,35 +34,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 navLogout.style.display = 'inline';
             }, 1000);
         } else {
-            showFlash('Usuario o contraseña incorrectos.', 'error');
+            showFlash('Credenciales incorrectas.', 'error');
         }
     });
 
-    // Función auxiliar para mostrar mensajes (rojo o verde)
     function showFlash(msg, type) {
         flashMsg.textContent = msg;
         flashMsg.className = `flash-msg ${type}`;
-        // Borrar mensaje a los 3 segundos
         setTimeout(() => { flashMsg.textContent = ''; flashMsg.className = 'flash-msg'; }, 3000);
     }
 
-    // Botón de cerrar sesión
     navLogout.addEventListener('click', (e) => {
         e.preventDefault();
-        location.reload(); // Recarga la página para limpiar todo
+        location.reload();
     });
 
-    /* =====================================================
-       2. LÓGICA DEL TABLERO Y CENSURA (FILTRO DE PALABRAS)
-    ===================================================== */
+    /* -----------------------------------------------------
+       2. LÓGICA DEL TABLERO Y FILTRO DE CONTENIDO (NUEVO)
+    ----------------------------------------------------- */
     const postForm = document.getElementById('post-form');
     const messagesList = document.getElementById('messages');
 
-    // LISTA NEGRA: Agrega aquí las palabras que quieras bloquear
-    const BAD_WORDS = [
-        'tonto', 'idiota', 'estupido', 'feo', 'odioso', 'inutil', 
-        'perra', 'mierda', 'basura', 'puta'
-    ];
+    // Lista de palabras prohibidas (puedes agregar más)
+    const BAD_WORDS = ['tonto', 'idiota', 'estupido', 'feo', 'odioso', 'inutil'];
 
     postForm.addEventListener('submit', (e) => {
         e.preventDefault();
@@ -77,51 +64,46 @@ document.addEventListener('DOMContentLoaded', () => {
         const recipient = document.getElementById('recipient').value || 'Todos';
         const rawContent = document.getElementById('content').value;
 
-        // PASO CLAVE: Filtrar el texto antes de mostrarlo
+        // APLICAR FILTRO: Reemplaza groserías con asteriscos
         const safeContent = filterText(rawContent);
 
-        // Crear y agregar la tarjeta al tablero
+        // Crear el elemento visual del mensaje
         addMessageToBoard(recipient, safeContent);
 
-        // Limpiar el campo de texto
+        // Limpiar formulario
         document.getElementById('content').value = '';
     });
 
-    // Función que reemplaza malas palabras por asteriscos
     function filterText(text) {
         let cleanText = text;
         BAD_WORDS.forEach(word => {
-            // 'gi' significa: global (todas las veces que aparezca) e insensible a mayúsculas/minúsculas
+            // Crea una expresión regular para buscar la palabra sin importar mayúsculas/minúsculas
             const regex = new RegExp(word, 'gi'); 
-            const stars = '*'.repeat(word.length); // Crea tantos asteriscos como letras tenga la palabra
+            // Reemplaza con asteriscos del mismo largo (ej: tonto -> *****)
+            const stars = '*'.repeat(word.length);
             cleanText = cleanText.replace(regex, stars);
         });
         return cleanText;
     }
 
-    // Función para crear el HTML del mensaje
     function addMessageToBoard(to, text) {
         const msgDiv = document.createElement('div');
-        
-        // Estilos directos para la tarjeta del mensaje (para no complicar el CSS)
+        msgDiv.className = 'message-card'; // Asegúrate de tener estilo para esto o usa un estilo simple
         msgDiv.style.border = "1px solid #ddd"; 
-        msgDiv.style.padding = "15px";
-        msgDiv.style.marginTop = "15px";
-        msgDiv.style.borderRadius = "8px";
-        msgDiv.style.backgroundColor = "#fff";
-        msgDiv.style.boxShadow = "0 2px 4px rgba(0,0,0,0.05)";
+        msgDiv.style.padding = "10px";
+        msgDiv.style.marginTop = "10px";
+        msgDiv.style.borderRadius = "5px";
+        msgDiv.style.backgroundColor = "#f9f9f9";
 
         // Obtener hora actual
         const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        // Obtener usuario actual (o anonimo si fallara algo)
-        const currentUser = document.getElementById('nav-user').textContent.replace('Usuario: ', '') || 'Anónimo';
 
         msgDiv.innerHTML = `
-            <div style="margin-bottom: 8px; font-size: 0.9em; color: #555;">
-                <strong>${currentUser}</strong> para <em>${to}</em>
-                <span style="float:right; color:#999;">${time}</span>
-            </div>
-            <div style="font-size: 1.1em; color: #333;">${text}</div>
+            <div style="font-weight: bold; color: #0056b3;">Para: ${to} <span style="font-size:0.8em; color:#666; float:right;">${time}</span></div>
+            <div style="margin-top: 5px;">${text}</div>
         `;
 
-        // Prepend agrega el mensaje al PRIN
+        // Agregar al principio de la lista
+        messagesList.prepend(msgDiv);
+    }
+});
