@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
 
     /* =====================================================
-       1. VARIABLES Y ELEMENTOS (Referencias al HTML)
+       1. VARIABLES Y ELEMENTOS
     ===================================================== */
     const loginForm = document.getElementById('login-form');
     const flashMsg = document.getElementById('flash');
@@ -14,20 +14,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const messagesList = document.getElementById('messages');
 
     // Usuarios Demo
-    const USERS = { 
-        'alice': 'password123', 
-        'bob': 'secret456' 
-    };
+    const USERS = { 'alice': 'password123', 'bob': 'secret456' };
 
-    // Lista de palabras prohibidas
+    // Lista negra (Censura)
     const BAD_WORDS = [
         'tonto', 'idiota', 'estupido', 'feo', 'odioso', 'inutil', 
         'perra', 'mierda', 'basura', 'puta'
     ];
 
+    /* =====================================================
+       2. LÓGICA DE INICIO (CARGAR DATOS)
+    ===================================================== */
+    // Verificar si ya hay una sesión activa (opcional, pero útil)
+    const currentUser = localStorage.getItem('collab_user');
+    if (currentUser) {
+        showBoard(currentUser);
+    }
 
     /* =====================================================
-       2. LÓGICA DEL LOGIN (INICIAR SESIÓN)
+       3. LÓGICA DEL LOGIN
     ===================================================== */
     if (loginForm) {
         loginForm.addEventListener('submit', (e) => {
@@ -37,33 +42,34 @@ document.addEventListener('DOMContentLoaded', () => {
             const password = document.getElementById('password').value;
             const privacyCheck = document.getElementById('accept-privacy');
 
-            // 1. Validar Checkbox de Privacidad
             if (!privacyCheck.checked) {
-                showFlash('Debes aceptar la política de privacidad y uso de datos.', 'error');
+                showFlash('Debes aceptar la política de privacidad.', 'error');
                 return;
             }
 
-            // 2. Validar Usuario y Contraseña
             if (USERS[username] && USERS[username] === password) {
-                showFlash('¡Bienvenido! Ingresando al sistema...', 'success');
-                
-                // Simular transición
-                setTimeout(() => {
-                    loginSection.style.display = 'none';
-                    boardSection.style.display = 'block';
-                    navUser.textContent = `Usuario: ${username}`;
-                    navLogout.style.display = 'inline';
-                }, 1000);
-
+                // Guardar sesión en LocalStorage
+                localStorage.setItem('collab_user', username);
+                showFlash('¡Bienvenido! Ingresando...', 'success');
+                setTimeout(() => showBoard(username), 1000);
             } else {
                 showFlash('Usuario o contraseña incorrectos.', 'error');
             }
         });
     }
 
+    function showBoard(username) {
+        if(loginSection) loginSection.style.display = 'none';
+        if(boardSection) boardSection.style.display = 'block';
+        if(navUser) navUser.textContent = `Usuario: ${username}`;
+        if(navLogout) navLogout.style.display = 'inline';
+        
+        // CARGAR MENSAJES GUARDADOS AL ENTRAR
+        loadMessages();
+    }
 
     /* =====================================================
-       3. LÓGICA DEL TABLERO (PUBLICAR MENSAJES)
+       4. LÓGICA DEL TABLERO (PUBLICAR Y GUARDAR)
     ===================================================== */
     if (postForm) {
         postForm.addEventListener('submit', (e) => {
@@ -71,38 +77,65 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const recipient = document.getElementById('recipient').value || 'Todos';
             const rawContent = document.getElementById('content').value;
+            const author = localStorage.getItem('collab_user') || 'Anónimo';
 
-            // Filtrar groserías antes de publicar
+            // Filtrar groserías
             const safeContent = filterText(rawContent);
 
-            addMessageToBoard(recipient, safeContent);
+            // Crear objeto del mensaje
+            const newMessage = {
+                author: author,
+                to: recipient,
+                text: safeContent,
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                date: new Date().toLocaleDateString()
+            };
 
-            // Limpiar campo
+            // 1. Mostrar en pantalla
+            addMessageToBoard(newMessage);
+            // 2. Guardar en Memoria Persistente
+            saveMessageToStorage(newMessage);
+
             document.getElementById('content').value = '';
         });
     }
 
+    /* =====================================================
+       5. GESTIÓN DE ALMACENAMIENTO (LOCALSTORAGE)
+    ===================================================== */
+    function saveMessageToStorage(msg) {
+        // Obtener mensajes existentes o crear lista vacía
+        let messages = JSON.parse(localStorage.getItem('collab_messages')) || [];
+        messages.push(msg); // Agregar el nuevo
+        localStorage.setItem('collab_messages', JSON.stringify(messages)); // Guardar
+    }
+
+    function loadMessages() {
+        // Limpiar tablero actual para no duplicar
+        messagesList.innerHTML = '';
+        
+        const messages = JSON.parse(localStorage.getItem('collab_messages')) || [];
+        // Invertir orden para ver los nuevos arriba (opcional)
+        messages.reverse().forEach(msg => addMessageToBoard(msg));
+    }
 
     /* =====================================================
-       4. FUNCIONES AUXILIARES (Hacen que todo funcione)
+       6. FUNCIONES AUXILIARES
     ===================================================== */
-
-    // Función: Mostrar mensajes de alerta (rojo/verde)
     function showFlash(msg, type) {
         flashMsg.textContent = msg;
         flashMsg.className = `flash-msg ${type}`;
         setTimeout(() => { flashMsg.textContent = ''; flashMsg.className = 'flash-msg'; }, 3000);
     }
 
-    // Función: Cerrar Sesión
     if (navLogout) {
         navLogout.addEventListener('click', (e) => {
             e.preventDefault();
+            localStorage.removeItem('collab_user'); // Borrar sesión activa
             location.reload(); 
         });
     }
 
-    // Función: Censurar palabras con asteriscos
     function filterText(text) {
         let cleanText = text;
         BAD_WORDS.forEach(word => {
@@ -113,11 +146,8 @@ document.addEventListener('DOMContentLoaded', () => {
         return cleanText;
     }
 
-    // Función: Crear la tarjeta visual del mensaje
-    function addMessageToBoard(to, text) {
+    function addMessageToBoard(msgData) {
         const msgDiv = document.createElement('div');
-        
-        // Estilos para la tarjeta
         msgDiv.style.border = "1px solid #ddd"; 
         msgDiv.style.padding = "15px";
         msgDiv.style.marginTop = "15px";
@@ -125,18 +155,18 @@ document.addEventListener('DOMContentLoaded', () => {
         msgDiv.style.backgroundColor = "#fff";
         msgDiv.style.boxShadow = "0 2px 4px rgba(0,0,0,0.05)";
 
-        const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        const currentUser = document.getElementById('nav-user').textContent.replace('Usuario: ', '') || 'Anónimo';
-
         msgDiv.innerHTML = `
             <div style="margin-bottom: 8px; font-size: 0.9em; color: #555;">
-                <strong>${currentUser}</strong> para <em>${to}</em>
-                <span style="float:right; color:#999;">${time}</span>
+                <strong>${msgData.author}</strong> para <em>${msgData.to}</em>
+                <span style="float:right; color:#999;">${msgData.date} - ${msgData.time}</span>
             </div>
-            <div style="font-size: 1.1em; color: #333;">${text}</div>
+            <div style="font-size: 1.1em; color: #333;">${msgData.text}</div>
         `;
-
-        messagesList.prepend(msgDiv);
+        // Append simple porque ya invertimos el array al cargar, 
+        // o Prepend si es un mensaje nuevo en vivo.
+        // Para simplificar, usamos prepend siempre en la vista:
+        messagesList.prepend(msgDiv); 
+        // NOTA: Al cargar desde memoria (loadMessages) los invertimos, 
+        // así que al hacer prepend quedan en orden correcto.
     }
-
-}); // <--- ESTE CIERRE ES VITAL, NO LO BORRES
+});
